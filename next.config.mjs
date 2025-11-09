@@ -1,18 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-
-    // output: "export",
-
-    eslint: {
-    // Warning: Điều này cho phép build thành công ngay cả khi có lỗi ESLint
-    ignoreDuringBuilds: true,
-    
-  },
   images: {
     remotePatterns: [
-     {
-        protocol: 'https',
-        hostname: 'your-backend-domain.com',
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '5000',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'backend', // Nếu frontend đang trong Docker và gọi tới backend
+        port: '5000',
         pathname: '/uploads/**',
       },
       {
