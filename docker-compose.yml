@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./back-end
+    container_name: backend
+    restart: always
+    volumes:
+      - ./back-end:/app
+      - /app/node_modules
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: host.docker.internal
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: store
+      DB_PORT: 3306
+      PORT: 5000
+      JWT_SECRET: TONY_NGUYEN
+      EMAIL_USER: nguyenlehoangtu120405@gmail.com
+      EMAIL_PASS: osqphwupqugfafdi
+      FRONTEND_URL: http://localhost:3000
+      REDIS_URL: redis://redis:6379
+    command: nodemon --legacy-watch server.js
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"

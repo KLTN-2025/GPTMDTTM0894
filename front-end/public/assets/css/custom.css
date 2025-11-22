@@ -1,0 +1,290 @@
+/*
+Custom Css
+*/
+/* Hiển thị dropdown khi hover */
+.nav-item.dropdown:hover .dropdown-menu {
+  display: block;
+  margin-top: 0; /* fix delay nhảy xuống */
+}
+
+.quantity-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.btn-qty {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  border: 1px solid #ced4da;
+  background-color: white;
+  color: #333;
+  border-radius: 4px;
+}
+
+.input-qty {
+  width: 40px;
+  height: 28px;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+  background-color: rgba(0, 0, 0, 0.3); /* Màu hơi mờ */
+  border-radius: 50%; /* Hình tròn */
+  width: 30px;
+  height: 30px;
+  background-size: 60% 60%; /* Thu nhỏ icon */
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 0.3s ease;
+  opacity: 0.5;
+}
+
+.carousel-control-prev-icon:hover,
+.carousel-control-next-icon:hover {
+  opacity: 0.9;
+}
+
+.custom-arrow {
+  width: 40px;
+  height: 40px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.5;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.custom-arrow:hover {
+  opacity: 1;
+}
+
+.custom-icon {
+  background-size: 50% 50%;
+  width: 16px;
+  height: 16px;
+}
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+  background-size: 100% 100%;
+}
+
+
+/* .nav-link {
+  margin: 10px;
+} */
+
+/* banner */
+
+/* ProductGrid.module.css */
+.products {
+  padding: 60px 20px;
+  background: #fff;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 30px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.product-card {
+  width: 100%;
+  max-width: 280px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-bottom: 20px;
+}
+
+.product-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.product-card img {
+  width: 200px;
+  height: auto;
+  display: block;
+  /* border-bottom: 1px solid #eee; */
+  padding: 10px;
+}
+
+.product-card h3 {
+  font-size: 18px;
+  margin: 16px 0 8px;
+}
+
+.product-card p {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 12px;
+}
+
+.product-card .btn {
+  margin: 0 5px;
+}
+
+.buttons-buy {
+  border: 1px solid #0071e3;
+  display: inline-block;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+.buttons-buy a {
+  display: inline-block;
+  text-decoration: none;
+  font-size: 14px;
+  padding: 8px 16px;
+  background-color: white;
+  color: #0071e3;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+.buttons-buy:hover a {
+  background-color: #0071e3;
+  color: white;
+}
+
+
+.bannerback {
+  width: 100%;
+  
+}
+
+.banner-img {
+  object-fit: cover;
+  height: auto;
+  width: 100%;
+}
+
+.carousel-indicators [data-bs-target] {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%; /* bo tròn */
+  background-color: #333; /* màu mặc định */
+  margin: 0 5px;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.carousel-indicators .active {
+  opacity: 1;
+  background-color: #000; /* màu khi active */
+}
+
+/* Nút điều hướng tùy chỉnh */
+.custom-nav {
+  width: 40px;
+  height: 40px;
+  background-color: white;
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.custom-nav:hover {
+  background-color: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+  opacity: 1;
+}
+
+/* Tùy chọn nếu muốn đổi màu icon */
+.custom-nav .carousel-control-prev-icon,
+.custom-nav .carousel-control-next-icon {
+  filter: invert(1); /* đổi màu thành đen để nổi bật trên nền trắng */
+}
+
+.carousel-indicators [data-bs-target] {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: white;
+  opacity: 0.5;
+  transition: 0.3s ease;
+}
+
+.carousel-indicators .active {
+  opacity: 1;
+  background-color: #ffffff;
+}
+
+input.form-control:focus {
+  box-shadow: none;
+  border-color: #000;
+}
+
+/* Container dropdown */
+.nav-icon i {
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background 0.3s ease;
+}
+
+
+ .otp-input {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.5rem;
+    margin: 0 0.25rem;
+  }
+
+  #addressList li.list-group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  word-break: break-word;
+}
+
+#addressList li .address-content {
+  max-width: 70%;
+  white-space: normal;
+  cursor: pointer;
+}
+
+#addressList li .address-actions {
+  flex-shrink: 0;
+}
+
+#addressList li.primary {
+  border-left: 5px solid #198754; /* màu xanh bootstrap */
+  background-color: #e9f7ef;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1rem auto;
+}
