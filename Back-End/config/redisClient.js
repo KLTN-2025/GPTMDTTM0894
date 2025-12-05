@@ -9,6 +9,7 @@ const client = createClient({
 
 client.on('error', (err) => console.error('❌ Redis Client Error', err));
 
-client.connect();
+// Không tự động connect ở đây, để server.js quản lý kết nối
+// client.connect();
 
 module.exports = client;

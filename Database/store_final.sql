@@ -26,7 +26,10 @@ SET time_zone = "+00:00";
 --
 -- Table structure for table `attributes`
 --
+DROP DATABASE IF EXISTS `store`;
+CREATE DATABASE `store`;
 
+USE `store`;
 CREATE TABLE `attributes` (
   `id_attribute` int NOT NULL,
   `name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

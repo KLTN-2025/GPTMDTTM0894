@@ -119,9 +119,9 @@ const HeaderClient = () => {
           <div className="w-100 d-flex justify-content-between">
             <div>
               <i className="fa fa-envelope mx-2"></i>
-              <a className="navbar-sm-brand text-light text-decoration-none" href="mailto:tonybuoisang@gmail.com">tonybuoisang@gmail.com</a>
+              <a className="navbar-sm-brand text-light text-decoration-none" href="mailto:minhduc28082003@gmail.com">minhduc28082003@gmail.com</a>
               <i className="fa fa-phone mx-2"></i>
-              <a className="navbar-sm-brand text-light text-decoration-none" href="tel:0777527125">0777527125</a>
+              <a className="navbar-sm-brand text-light text-decoration-none" href="tel:0925780025">0925780025</a>
             </div>
             <div>
               <a className="text-light" href="https://fb.com/templatemo" target="_blank" rel="noopener noreferrer"><i className="fab fa-facebook-f fa-sm fa-fw me-2"></i></a>
@@ -156,7 +156,7 @@ const HeaderClient = () => {
                 
                 {parentCategories.map(cat => (
                       <li className="nav-item mx-2" key={cat.category_id} >
-                        <Link href={`/products/${cat.name}`} className="nav-link">
+                        <Link href={`/products/${cat.category_id}`} className="nav-link">
                           {cat.name}
                         </Link>
                       </li>
@@ -313,7 +313,7 @@ const HeaderClient = () => {
 
                           // Điều hướng Next.js
                           router.push(
-                            `/productDetail/${item.products_slug}`
+                            `/productDetail/${item.products_id || item.id_products}`
                           );
                         }}
                       >

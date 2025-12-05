@@ -23,8 +23,10 @@ const VoucherRoute = require('./voucher.route');
 const CartRoute = require('./cart.route');
 
 const CheckoutRoute = require('./order.route');
+const DashboardRoute = require('./dashboard.route');
 
 // Dùng route con
+router.use('/dashboard', DashboardRoute); // => /api/dashboard
 router.use('/categories', categoryRoute); // => /api/categories
 
 router.use('/products', productRoute); //=> api/products

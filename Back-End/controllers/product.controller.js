@@ -25,18 +25,32 @@ const {
 exports.searchProducts = async (req, res) => {
   try {
     const keyword = req.query.q?.trim();
+    const category_id = req.query.category_id ? parseInt(req.query.category_id) : null;
+    const parent_id = req.query.parent_id ? parseInt(req.query.parent_id) : null;
 
     if (!keyword) {
       return res.status(400).json({ message: "Vui lòng nhập từ khóa tìm kiếm" });
     }
 
-    const rows = await Product.findAll({
-      where: {
-        products_name: {
-          [Op.like]: `%${keyword}%`
-        },
-        products_status: 2
+    const whereClause = {
+      products_name: {
+        [Op.like]: `%${keyword}%`
       },
+      products_status: { [Op.in]: [2, 4] } // Đang hoạt động
+    };
+
+    // Nếu có category_id, filter theo category đó
+    if (category_id) {
+      whereClause.category_id = category_id;
+    } 
+    // Nếu có parent_id, lấy tất cả category con
+    else if (parent_id) {
+      const allIds = await getAllChildCategoryIds(parent_id);
+      whereClause.category_id = { [Op.in]: allIds };
+    }
+
+    const rows = await Product.findAll({
+      where: whereClause,
       include: [
         {
           model: ProductImg,
@@ -64,8 +78,9 @@ exports.searchProducts = async (req, res) => {
           ]
         }
       ],
+      distinct: true, // Thêm distinct để tránh duplicate
       order: [["products_name", "ASC"]],
-      limit: 8
+      limit: 50 // Tăng limit để hiển thị nhiều sản phẩm hơn
     });
 
     if (rows.length === 0) {
@@ -661,12 +676,22 @@ exports.updateProduct = async (req, res) => {
           const parsedQuantity = parseInt(quantity, 10);
           const parsedStatus = [1, '1', true, 2, '2'].includes(statusInput) ? 1 : 0;
 
+          // ✅ Validate giá trị extra_price (DECIMAL(15,2) có thể lưu tối đa ~999,999,999,999,999.99)
+          const MAX_EXTRA_PRICE = 999999999999999.99;
           if (
             isNaN(parsedExtraPrice) ||
             isNaN(parsedQuantity) ||
-            typeof parsedStatus !== 'number'
+            typeof parsedStatus !== 'number' ||
+            parsedExtraPrice < 0 ||
+            parsedExtraPrice > MAX_EXTRA_PRICE
           ) {
-            console.warn(`⚠️ Dữ liệu không hợp lệ`, { val });
+            console.warn(`⚠️ Dữ liệu không hợp lệ`, { 
+              val, 
+              parsedExtraPrice,
+              reason: isNaN(parsedExtraPrice) ? 'NaN' : 
+                      parsedExtraPrice < 0 ? 'Negative' : 
+                      parsedExtraPrice > MAX_EXTRA_PRICE ? 'Too large' : 'Unknown'
+            });
             continue;
           }
 
@@ -1057,8 +1082,11 @@ exports.updateProduct = async (req, res) => {
 
 //getProductByid
 exports.getProductsByIdforAdmin = async (req, res) => {
+  const id = parseInt(req.params.id);
 
-  const id = req.params.id;
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "ID sản phẩm không hợp lệ" });
+  }
 
   try {
     // 1. Thông tin sản phẩm chính
@@ -1088,14 +1116,14 @@ exports.getProductsByIdforAdmin = async (req, res) => {
 
     // const id= product.id_products;
 
-    // 2. Ảnh sản phẩm
+    // 2. Ảnh sản phẩm (lấy tất cả ảnh chính, không chỉ is_main)
     const images = await ProductImg.findAll({
       where: { 
         id_products: id,
         id_value: null,
         id_variant: null,
-        is_main: true 
       },
+      order: [['is_main', 'DESC'], ['id_product_img', 'ASC']], // Ưu tiên ảnh main trước
     });
 
     // 3. Thông số kỹ thuật
@@ -1279,12 +1307,19 @@ exports.getProductsByIdforAdmin = async (req, res) => {
 
 //getProductByid
 exports.getProductsById = async (req, res) => {
-  const slug = req.params.slug;
+  const idOrSlug = req.params.slug; // Giữ tên param là slug để tương thích, nhưng có thể là ID hoặc slug
 
   try {
+    // Kiểm tra xem là ID (số) hay slug (chuỗi)
+    const isNumeric = /^\d+$/.test(idOrSlug);
+    
     // 1. Thông tin sản phẩm chính
+    const whereClause = isNumeric 
+      ? { id_products: parseInt(idOrSlug) } // Nếu là số, tìm theo ID
+      : { products_slug: idOrSlug }; // Nếu là chuỗi, tìm theo slug
+    
     const product = await Product.findOne({
-      where: { products_slug: slug },
+      where: whereClause,
       include: [
         {
           model: Category,
@@ -1575,28 +1610,30 @@ exports.getAllProducts = async (req, res) => {
         productType = 2;
       }
 
+      // ✅ Trả về giá gốc từ database (giá đã được admin sửa)
+      // Không tính lại từ attributes/variants vì đây là API cho admin panel
       let marketPrice = parseFloat(p.products_market_price) || 0;
       let salePrice = parseFloat(p.products_sale_price) || 0;
 
-      if (productType === 2) {
-
-        // Giá thị trường giữ nguyên
-        const extraPrices = p.productAttributeValues
-          .map(item => parseFloat(item?.attributeValue?.extra_price))
-          .filter(val => !isNaN(val));
-
-        if (extraPrices.length > 0) {
-          salePrice = Math.min(...extraPrices);
-        }
-
-      } else if (productType === 3) {
-
+      // Chỉ tính lại giá nếu giá gốc = 0 hoặc null (sản phẩm mới chưa có giá)
+      if (marketPrice === 0 && productType === 3) {
         const variantPrices = p.variants.map(v => parseFloat(v.price)).filter(v => !isNaN(v));
-        const variantSalePrices = p.variants.map(v => parseFloat(v.price_sale)).filter(v => !isNaN(v));
-
         if (variantPrices.length > 0) marketPrice = Math.min(...variantPrices);
-        if (variantSalePrices.length > 0) salePrice = Math.min(...variantSalePrices);
+      }
 
+      if (salePrice === 0) {
+        if (productType === 2) {
+          // Nếu salePrice = 0, tính từ extra_price
+          const extraPrices = p.productAttributeValues
+            .map(item => parseFloat(item?.attributeValue?.extra_price))
+            .filter(val => !isNaN(val));
+          if (extraPrices.length > 0) {
+            salePrice = Math.min(...extraPrices);
+          }
+        } else if (productType === 3) {
+          const variantSalePrices = p.variants.map(v => parseFloat(v.price_sale)).filter(v => !isNaN(v));
+          if (variantSalePrices.length > 0) salePrice = Math.min(...variantSalePrices);
+        }
       }
 
       return {
@@ -1693,36 +1730,145 @@ exports.deleteProductHard = async (req, res) => {
   
 };
 
-//getProductByidforAdmin
-exports.getProductsByIdforAdmin = async (req, res) => {
-    // ... code hàm getProductsByIdforAdmin ...
-    
-}; 
 
 
 // products.controller.js
 exports.getTopProducts = async (req, res) => {
     try {
-        // ✅ BỎ QUA TRUY VẤN DATABASE VÀ TRẢ VỀ DỮ LIỆU CỐ ĐỊNH (MOCK DATA)
-        const mockProducts = [
-            {
-                products_id: 999,
-                products_slug: "iphone-test-15",
-                products_name: "Sản phẩm TEST MẪU",
-                main_image_url: "https://via.placeholder.com/150/FF0000/FFFFFF?text=TEST", // Ảnh tạm màu đỏ
-                market_price: 30000000,
-                sale_price: 28000000,
-                productType: 1,
-            }
-        ];
+        // Lấy sản phẩm nổi bật (primary = true) và đang hoạt động (status = 2 hoặc 4)
+        const { limit = 8 } = req.query;
+        const limitNum = parseInt(limit);
 
-        console.log("➡️ Sản phẩm được trả về (MOCK DATA):", mockProducts.length);
+        let products = await Product.findAll({
+            where: {
+                products_primary: 1, // Sản phẩm nổi bật
+                products_status: { [Op.in]: [2, 4] } // Đang hoạt động
+            },
+            include: [
+                {
+                    model: ProductImg,
+                    as: "images",
+                    where: { is_main: true, id_value: null, id_variant: null },
+                    required: false,
+                    attributes: ["Img_url", "is_main"],
+                },
+                {
+                    model: ProductVariant,
+                    as: 'variants',
+                    required: false,
+                    attributes: ['id_variant', 'price', 'price_sale'],
+                },
+                {
+                    model: ProductAttributeValue,
+                    as: 'productAttributeValues',
+                    required: false,
+                    include: [
+                        {
+                            model: AttributeValue,
+                            as: 'attributeValue',
+                            attributes: ['id_value', 'value', 'extra_price'],
+                        }
+                    ],
+                }
+            ],
+            distinct: true,
+            order: [["id_products", "DESC"]], // Sắp xếp mới nhất trước
+            limit: limitNum,
+        });
+
+        // Nếu không có sản phẩm primary, lấy sản phẩm mới nhất
+        if (!products || products.length === 0) {
+            products = await Product.findAll({
+                where: {
+                    products_status: { [Op.in]: [2, 4] } // Đang hoạt động
+                },
+                include: [
+                    {
+                        model: ProductImg,
+                        as: "images",
+                        where: { is_main: true, id_value: null, id_variant: null },
+                        required: false,
+                        attributes: ["Img_url", "is_main"],
+                    },
+                    {
+                        model: ProductVariant,
+                        as: 'variants',
+                        required: false,
+                        attributes: ['id_variant', 'price', 'price_sale'],
+                    },
+                    {
+                        model: ProductAttributeValue,
+                        as: 'productAttributeValues',
+                        required: false,
+                        include: [
+                            {
+                                model: AttributeValue,
+                                as: 'attributeValue',
+                                attributes: ['id_value', 'value', 'extra_price'],
+                            }
+                        ],
+                    }
+                ],
+                distinct: true,
+                order: [["id_products", "DESC"]], // Sắp xếp mới nhất trước
+                limit: limitNum,
+            });
+        }
+
+        // Format dữ liệu giống như getAllProducts
+        const formattedProducts = products.map(p => {
+            // Tự xác định productType
+            let productType = 1;
+
+            if (p.variants && p.variants.length > 0) {
+                productType = 3;
+            } else if (p.productAttributeValues && p.productAttributeValues.length > 0) {
+                productType = 2;
+            }
+
+            let marketPrice = parseFloat(p.products_market_price) || 0;
+            let salePrice = parseFloat(p.products_sale_price) || 0;
+
+            if (productType === 2) {
+                // Giá thị trường giữ nguyên
+                const extraPrices = p.productAttributeValues
+                    .map(item => parseFloat(item?.attributeValue?.extra_price))
+                    .filter(val => !isNaN(val));
+
+                if (extraPrices.length > 0) {
+                    salePrice = Math.min(...extraPrices);
+                }
+            } else if (productType === 3) {
+                const variantPrices = p.variants.map(v => parseFloat(v.price)).filter(v => !isNaN(v));
+                const variantSalePrices = p.variants.map(v => parseFloat(v.price_sale)).filter(v => !isNaN(v));
+
+                if (variantPrices.length > 0) marketPrice = Math.min(...variantPrices);
+                if (variantSalePrices.length > 0) salePrice = Math.min(...variantSalePrices);
+            }
+
+            return {
+                id_products: p.id_products,
+                products_id: p.id_products,
+                products_slug: p.products_slug,
+                products_name: p.products_name,
+                market_price: marketPrice,
+                sale_price: salePrice,
+                products_market_price: marketPrice,
+                products_sale_price: salePrice,
+                products_primary: Boolean(p.products_primary),
+                products_status: p.products_status,
+                main_image_url: p.images?.[0]?.Img_url || null,
+                category_id: p.category_id,
+                productType,
+            };
+        });
+
+        console.log("➡️ Sản phẩm Top Products (từ database):", formattedProducts.length);
         
-        // Trả về dữ liệu giả lập cho Frontend
-        return res.status(200).json({ products: mockProducts }); 
+        return res.status(200).json({ products: formattedProducts }); 
         
     } catch (error) {
         console.error("❌ Lỗi Server khi lấy Top Products:", error);
-        return res.status(500).json({ message: "Lỗi Server - Top Products" });
+        return res.status(500).json({ message: "Lỗi Server - Top Products", error: error.message });
     }
 };

@@ -166,13 +166,14 @@ exports.updateVoucher = async (req, res) => {
 //apply voucher
 exports.applyVoucher = async (req, res) => {
   const { code, total, productIds } = req.body;
-  const userId = req.user?.id_customer;
+  const userId = req.customer?.id_customer;
 
   if (!userId) {
     return res.status(401).json({ message: 'Bạn cần đăng nhập để sử dụng voucher' });
   }
 
   try {
+    // Status: 1 = Chờ duyệt, 2 = Hoạt động, 3 = Đã ẩn
     const voucher = await Voucher.findOne({
       where: { code, status: 2 }
     });
@@ -210,14 +211,26 @@ exports.applyVoucher = async (req, res) => {
       }
     }
 
+    // Kiểm tra voucher có áp dụng cho sản phẩm cụ thể không
     const voucherProducts = await VoucherProduct.findAll({
       where: { id_voucher: voucher.id_voucher }
     });
+    
+    // Nếu voucher có danh sách sản phẩm cụ thể, kiểm tra sản phẩm trong giỏ hàng
     if (voucherProducts.length > 0) {
-      const validProductIds = voucherProducts.map(vp => vp.id_product);
-      const hasValidProduct = productIds.some(pid => validProductIds.includes(pid));
+      // Convert tất cả về number để so sánh chính xác
+      const validProductIds = voucherProducts.map(vp => Number(vp.id_product));
+      const cartProductIds = Array.isArray(productIds) 
+        ? productIds.map(pid => Number(pid))
+        : [];
+      
+      // Kiểm tra xem có ít nhất 1 sản phẩm trong giỏ hàng nằm trong danh sách sản phẩm của voucher
+      const hasValidProduct = cartProductIds.some(pid => validProductIds.includes(pid));
+      
       if (!hasValidProduct) {
-        return res.status(400).json({ message: 'Voucher không áp dụng cho sản phẩm trong đơn hàng' });
+        return res.status(400).json({ 
+          message: 'Voucher không áp dụng cho sản phẩm trong đơn hàng. Vui lòng kiểm tra lại mã giảm giá.' 
+        });
       }
     }
 

@@ -174,6 +174,20 @@ export default function CheckoutPage({ idCustomer }) {
 
       const address = `${newAddress.name_address}, ${newAddress.name_ward}, ${newAddress.name_city}`;
 
+      // Lấy voucher code từ localStorage nếu có
+      let voucherCode = null;
+      if (typeof window !== "undefined") {
+        const savedVoucher = localStorage.getItem("appliedVoucher");
+        if (savedVoucher) {
+          try {
+            const voucher = JSON.parse(savedVoucher);
+            voucherCode = voucher.code;
+          } catch (err) {
+            console.error("Lỗi khi đọc voucher:", err);
+          }
+        }
+      }
+
       const dataToSend = {
         id_customer: idCustomer || localStorage.getItem("id_customer"),
         name: userInfo.name,
@@ -192,6 +206,7 @@ export default function CheckoutPage({ idCustomer }) {
           }).filter(Boolean).join(", ") || "";
 
           return {
+            id_cart_items: item.id_cart_items, // Thêm id_cart_items để backend xóa đúng items
             id_product: item.id_product,
             quantity: item.quantity,
             price: item.price,
@@ -202,10 +217,16 @@ export default function CheckoutPage({ idCustomer }) {
         }),
         note,
         total_amount: totalAmount,
+        voucher_code: voucherCode, // Gửi voucher code để backend xử lý
       };
 
       const headers = { Authorization: `Bearer ${token}` };
       const res = await axios.post("http://localhost:5000/api/order/checkout", dataToSend, { headers });
+
+      // Xóa voucher khỏi localStorage sau khi đặt hàng thành công
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("appliedVoucher");
+      }
 
       if (paymentMethod === 2 && res.data.payUrl) {
         window.open(res.data.payUrl, '_blank');

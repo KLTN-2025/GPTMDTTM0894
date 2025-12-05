@@ -17,6 +17,7 @@ exports.checkout = async (req, res) => {
       cart_items,
       note,
       total_amount: totalAmountFromClient,
+      voucher_code,
     } = req.body;
 
     // Kiểm tra dữ liệu bắt buộc
@@ -84,11 +85,95 @@ exports.checkout = async (req, res) => {
     console.log(`Product ${product.products_name} price calculated: ${price}`);
     }
 
-    // Xác định tổng tiền lưu vào DB
+    // Xử lý voucher nếu có
+    let voucherDiscount = 0;
+    let appliedVoucher = null;
+    
+    if (voucher_code) {
+      try {
+        const Voucher = db.Voucher;
+        const VoucherUsage = db.VoucherUsage;
+        const VoucherProduct = db.VoucherProduct;
+        
+        // Tìm voucher với status = 2 (Hoạt động)
+        const voucher = await Voucher.findOne({
+          where: { code: voucher_code, status: 2 },
+          transaction: t
+        });
+
+        if (voucher) {
+          const now = new Date();
+          // Kiểm tra thời gian hiệu lực
+          const isValidDate = 
+            (!voucher.start_date || new Date(voucher.start_date) <= now) &&
+            (!voucher.end_date || new Date(voucher.end_date) >= now);
+
+          // Kiểm tra giá trị đơn hàng tối thiểu
+          const meetsMinOrder = !voucher.min_order_value || total_amount >= Number(voucher.min_order_value);
+
+          // Kiểm tra sản phẩm trong giỏ hàng
+          const voucherProducts = await VoucherProduct.findAll({
+            where: { id_voucher: voucher.id_voucher },
+            transaction: t
+          });
+
+          let isValidProduct = true;
+          if (voucherProducts.length > 0) {
+            const validProductIds = voucherProducts.map(vp => Number(vp.id_product));
+            const cartProductIds = cart_items.map(item => Number(item.id_product));
+            isValidProduct = cartProductIds.some(pid => validProductIds.includes(pid));
+          }
+
+          // Kiểm tra giới hạn sử dụng
+          const withinUsageLimit = !voucher.usage_limit || voucher.usage_count < voucher.usage_limit;
+
+          // Kiểm tra giới hạn user
+          let withinUserLimit = true;
+          if (voucher.user_limit) {
+            const usedCount = await VoucherUsage.count({
+              where: {
+                id_voucher: voucher.id_voucher,
+                id_customer: id_customer,
+              },
+              transaction: t
+            });
+            withinUserLimit = usedCount < voucher.user_limit;
+          }
+
+          if (isValidDate && meetsMinOrder && isValidProduct && withinUsageLimit && withinUserLimit) {
+            appliedVoucher = voucher;
+            
+            // Tính discount
+            if (voucher.discount_type === 'percent') {
+              voucherDiscount = total_amount * (Number(voucher.discount_value) / 100);
+            } else {
+              voucherDiscount = Number(voucher.discount_value);
+            }
+            
+            // Đảm bảo discount không vượt quá total
+            if (voucherDiscount > total_amount) {
+              voucherDiscount = total_amount;
+            }
+
+            // Cập nhật usage_count
+            await voucher.update(
+              { usage_count: voucher.usage_count + 1 },
+              { transaction: t }
+            );
+          }
+        }
+      } catch (voucherError) {
+        console.error("Lỗi khi xử lý voucher:", voucherError);
+        // Không block đơn hàng nếu voucher lỗi, chỉ bỏ qua voucher
+      }
+    }
+
+    // Xác định tổng tiền lưu vào DB (sau khi trừ discount)
+    const totalAfterDiscount = total_amount - voucherDiscount;
     const totalAmountToSave =
       !isNaN(parseFloat(totalAmountFromClient)) && totalAmountFromClient > 0
         ? parseFloat(totalAmountFromClient)
-        : total_amount;
+        : totalAfterDiscount;
 
     // Tạo link MoMo nếu thanh toán online
     let payUrl = null;
@@ -125,6 +210,18 @@ exports.checkout = async (req, res) => {
       },
       { transaction: t }
     );
+
+    // Tạo VoucherUsage record nếu có voucher
+    if (appliedVoucher) {
+      await db.VoucherUsage.create(
+        {
+          id_voucher: appliedVoucher.id_voucher,
+          id_customer: id_customer,
+          usage_date: new Date(), // Thêm usage_date bắt buộc
+        },
+        { transaction: t }
+      );
+    }
 
     // Tạo OrderDetail và Option nếu có
     for (const detail of orderDetails) {
@@ -177,6 +274,74 @@ exports.checkout = async (req, res) => {
         products: orderDetails,
         note,
       });
+    }
+
+    // Xóa giỏ hàng sau khi đặt hàng thành công
+    try {
+      const Cart = db.Cart;
+      const CartItem = db.CartItem;
+      const CartItemAttributeValue = db.CartItemAttributeValue;
+
+      // Tìm giỏ hàng của customer
+      const cart = await Cart.findOne({
+        where: { id_customer },
+        transaction: t
+      });
+
+      if (cart) {
+        // Lấy danh sách id_cart_items từ cart_items nếu có
+        const cartItemIds = cart_items
+          .map(item => item.id_cart_items)
+          .filter(Boolean);
+
+        if (cartItemIds.length > 0) {
+          // Xóa các cart items đã được đặt hàng
+          // Xóa CartItemAttributeValue trước
+          await CartItemAttributeValue.destroy({
+            where: {
+              id_cart_items: { [Op.in]: cartItemIds }
+            },
+            transaction: t
+          });
+
+          // Xóa CartItem
+          await CartItem.destroy({
+            where: {
+              id_cart_items: { [Op.in]: cartItemIds },
+              id_cart: cart.id_cart
+            },
+            transaction: t
+          });
+        } else {
+          // Nếu không có id_cart_items, xóa toàn bộ giỏ hàng
+          const allCartItems = await CartItem.findAll({
+            where: { id_cart: cart.id_cart },
+            attributes: ['id_cart_items'],
+            transaction: t
+          });
+
+          if (allCartItems.length > 0) {
+            const allCartItemIds = allCartItems.map(item => item.id_cart_items);
+
+            // Xóa CartItemAttributeValue
+            await CartItemAttributeValue.destroy({
+              where: {
+                id_cart_items: { [Op.in]: allCartItemIds }
+              },
+              transaction: t
+            });
+
+            // Xóa CartItem
+            await CartItem.destroy({
+              where: { id_cart: cart.id_cart },
+              transaction: t
+            });
+          }
+        }
+      }
+    } catch (cartError) {
+      // Log lỗi nhưng không rollback transaction vì order đã được tạo thành công
+      console.error("Lỗi khi xóa giỏ hàng:", cartError);
     }
 
     await t.commit();

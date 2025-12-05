@@ -3,6 +3,15 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Image from "next/image";
 
+const formatVND = (value) => {
+  const numValue = Number(value) || 0;
+  return numValue.toLocaleString("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    minimumFractionDigits: 0,
+  });
+};
+
 export default function CategoryProduct() {
   const [categories, setCategories] = useState([]);
 
@@ -41,7 +50,7 @@ export default function CategoryProduct() {
                     className="col-12 col-sm-6 col-md-4 col-lg-3 mb-4"
                   >
                     <div className="card h-100 shadow-sm border-0 rounded-4">
-                      <a href={`//productDetail/${product.products_slug || product.id_products}`}>
+                      <a href={`/productDetail/${product.id_products}`}>
                         <Image
                           src={imageUrl}
                           className="card-img-top p-3 rounded-4"
@@ -54,7 +63,7 @@ export default function CategoryProduct() {
                       <div className="card-body text-center">
                         <h6 className="card-title mb-2">
                           <a
-                            href={`/productDetail/${product.slug || product.id_products}`}
+                            href={`/productDetail/${product.id_products}`}
                             className="text-decoration-none text-dark fw-bold"
                           >
                             {product.products_name}
@@ -63,15 +72,17 @@ export default function CategoryProduct() {
 
                         <div className="mb-2">
                           <span className="text-danger fw-bold">
-                            {parseInt(product.products_sale_price).toLocaleString("vi-VN")}đ
+                            {formatVND(product.products_sale_price || product.sale_price || 0)}
                           </span>{" "}
-                          <span className="text-muted text-decoration-line-through small">
-                            {parseInt(product.products_market_price).toLocaleString("vi-VN")}đ
-                          </span>
+                          {(product.products_market_price || product.market_price) > (product.products_sale_price || product.sale_price) && (
+                            <span className="text-muted text-decoration-line-through small">
+                              {formatVND(product.products_market_price || product.market_price || 0)}
+                            </span>
+                          )}
                         </div>
 
                         <a
-                          href={`/productDetail/${product.slug || product.id_products}`}
+                          href={`/productDetail/${product.id_products}`}
                           className="btn btn-outline-dark btn-sm rounded-pill px-3"
                         >
                           Xem chi tiết
@@ -86,7 +97,7 @@ export default function CategoryProduct() {
             {/* Nút xem thêm danh mục */}
             <div className="row mt-3">
               <div className="col text-center">
-                <a href={`/products/${cat.name}`} className="btn btn-primary btn-lg px-5">
+                <a href={`/products/${cat.category_id}`} className="btn btn-primary btn-lg px-5">
                   Xem tất cả {cat.name}
                 </a>
               </div>

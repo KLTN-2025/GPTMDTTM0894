@@ -15,7 +15,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     value_note: DataTypes.TEXT,
     quantity: DataTypes.INTEGER,
-    extra_price: DataTypes.DECIMAL(10, 2),
+    extra_price: DataTypes.DECIMAL(15, 2), // ✅ Tăng từ (10,2) lên (15,2) để hỗ trợ giá trị lớn hơn (tối đa ~999 tỷ)
     status: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

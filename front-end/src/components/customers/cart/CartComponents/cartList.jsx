@@ -38,7 +38,7 @@ export default function CartList({ items, onUpdateQuantity, onDeleteItem }) {
             {/* Sản phẩm */}
             <Col md={6} className="d-flex">
               <div key={item.product.id_products}>
-                 <Link href={`/productDetail/${item.product.products_slug || item.product.id_products}`}>
+                 <Link href={`/productDetail/${item.product.id_products}`}>
                  
                 <Image
                   src={image}

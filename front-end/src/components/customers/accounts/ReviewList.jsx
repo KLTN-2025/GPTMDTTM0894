@@ -48,7 +48,7 @@ export default function CustomerReviewPage() {
               <div className="border rounded p-3 shadow-sm h-100">
                 <div className="d-flex justify-content-between align-items-center mb-2">
                 <Link
-                    href={`/productDetail/${r.product?.slug || r.product?.id_products}`}
+                    href={`/productDetail/${r.product?.id_products}`}
                     className="text-decoration-none text-primary fw-bold"
                     >
                     {r.product?.products_name}

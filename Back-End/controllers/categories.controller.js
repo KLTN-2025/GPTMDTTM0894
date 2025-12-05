@@ -215,35 +215,76 @@ exports.getParentCategories = async (req, res) => {
 
 // controllers/category.controller.js
 exports.getCategoryDetail = async (req, res) => {
-  const { name } = req.params;
+  const { id } = req.params;
 
   try {
-    // 1. Lấy danh mục cha
-    const parentCategory = await Category.findOne({
-      where: { name, parent_id: null },
-      attributes: ['category_id', 'name', 'note', 'img'],
+    // 1. Lấy category theo ID (có thể là category cha hoặc con)
+    const categoryId = parseInt(id);
+    if (isNaN(categoryId)) {
+      return res.status(400).json({ error: 'Invalid category ID' });
+    }
+
+    const category = await Category.findOne({
+      where: { category_id: categoryId },
+      attributes: ['category_id', 'name', 'note', 'img', 'parent_id'],
     });
 
-    if (!parentCategory) {
+    if (!category) {
       return res.status(404).json({ error: 'Category not found' });
     }
 
-    const parentId = parentCategory.category_id;
+    // Xác định category cha và category con
+    let parentCategory = category;
+    let parentId = category.category_id;
+    let targetCategoryId = categoryId; // Category để lấy sản phẩm
+    
+    if (category.parent_id) {
+      // Đây là category con, lấy category cha để hiển thị
+      parentCategory = await Category.findOne({
+        where: { category_id: category.parent_id },
+        attributes: ['category_id', 'name', 'note', 'img'],
+      });
+      if (parentCategory) {
+        parentId = parentCategory.category_id;
+      } else {
+        // Nếu không tìm thấy category cha, dùng category hiện tại
+        parentId = category.category_id;
+        parentCategory = category;
+      }
+      // Nếu là category con, chỉ lấy sản phẩm của category đó
+      targetCategoryId = categoryId;
+    } else {
+      // Đây là category cha, lấy tất cả sản phẩm của category cha và các category con
+      targetCategoryId = parentId;
+    }
 
-    // 2. Lấy danh mục con
+    // 2. Lấy danh mục con của category cha
     const children = await Category.findAll({
       where: { parent_id: parentId },
       attributes: ['category_id', 'name', 'img'],
     });
 
-    const childIds = children.map(child => child.category_id);
-    const allCategoryIds = [parentId, ...childIds];
+    // 3. Xác định danh sách category để lấy sản phẩm
+    let allCategoryIds;
+    if (category.parent_id) {
+      // Nếu là category con, chỉ lấy sản phẩm của category đó và các category con của nó (nếu có)
+      const subChildren = await Category.findAll({
+        where: { parent_id: categoryId },
+        attributes: ['category_id'],
+      });
+      const subChildIds = subChildren.map(child => child.category_id);
+      allCategoryIds = [categoryId, ...subChildIds];
+    } else {
+      // Nếu là category cha, lấy tất cả sản phẩm của category cha và các category con
+      const childIds = children.map(child => child.category_id);
+      allCategoryIds = [parentId, ...childIds];
+    }
 
     // 3. Lấy sản phẩm
     const products = await Product.findAll({
       where: {
-        category_id: allCategoryIds,
-        products_status: 2,
+        category_id: { [Op.in]: allCategoryIds }, // ✅ Sửa: dùng Op.in để filter theo nhiều category
+        products_status: { [Op.in]: [2, 4] }, // Đang hoạt động (giống searchProducts)
       },
       attributes: [
         'id_products',
@@ -262,11 +303,15 @@ exports.getCategoryDetail = async (req, res) => {
           where: { is_main: true, id_value: null, id_variant: null },
         },
       ],
+      distinct: true, // ✅ Tránh duplicate khi có join
     });
+
+    console.log(`📦 Lấy được ${products.length} sản phẩm từ ${allCategoryIds.length} category (${parentCategory.name})`);
 
     // 4. Với mỗi sản phẩm, lấy attributes và skus, rồi tính giá
     const productsWithPrices = await Promise.all(products.map(async (product) => {
-      const id = product.id_products;
+      try {
+        const id = product.id_products;
 
       // Lấy attributes + giá trị
       const productAttributes = await ProductAttribute.findAll({
@@ -384,15 +429,27 @@ exports.getCategoryDetail = async (req, res) => {
         }
       }
 
-      // Trả về sản phẩm kèm giá đã tính
-      return {
-        ...product.toJSON(),
-        attributes,
-        skus,
-        productType,
-        market_price: originalPrice,
-        sale_price: salePrice,
-      };
+        // Trả về sản phẩm kèm giá đã tính
+        return {
+          ...product.toJSON(),
+          attributes,
+          skus,
+          productType,
+          market_price: originalPrice,
+          sale_price: salePrice,
+        };
+      } catch (err) {
+        console.error(`❌ Lỗi khi xử lý sản phẩm ${product.id_products}:`, err);
+        // Trả về sản phẩm cơ bản nếu có lỗi
+        return {
+          ...product.toJSON(),
+          attributes: [],
+          skus: [],
+          productType: 1,
+          market_price: parseFloat(product.products_market_price) || 0,
+          sale_price: parseFloat(product.products_sale_price) || 0,
+        };
+      }
     }));
 
     // 5. Trả về dữ liệu
@@ -420,7 +477,7 @@ exports.getHomepageData = async (req, res) => {
           model: Product,
           as: 'products',
           required: false,
-          attributes: ['id_products', 'category_id', 'products_name', 'products_primary', 'products_status'],
+          attributes: ['id_products', 'category_id', 'products_name', 'products_slug', 'products_primary', 'products_status', 'products_market_price', 'products_sale_price'],
           where: {
             products_primary: 1, // bạn có thể bật lên nếu muốn lọc theo
             products_status: { [Op.in]: [2, 4] }
@@ -436,6 +493,24 @@ exports.getHomepageData = async (req, res) => {
                 id_value: null,
               },
               attributes: ['id_product_img', 'Img_url']
+            },
+            {
+              model: ProductVariant,
+              as: 'variants',
+              required: false,
+              attributes: ['id_variant', 'price', 'price_sale'],
+            },
+            {
+              model: ProductAttributeValue,
+              as: 'productAttributeValues',
+              required: false,
+              include: [
+                {
+                  model: AttributeValue,
+                  as: 'attributeValue',
+                  attributes: ['id_value', 'value', 'extra_price'],
+                }
+              ],
             }
           ],
         }
@@ -447,7 +522,53 @@ exports.getHomepageData = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy danh mục hoặc sản phẩm" });
     }
 
-    res.json(categories);
+    // Tính toán giá cho từng sản phẩm
+    const categoriesWithPrices = categories.map(category => {
+      const productsWithPrices = (category.products || []).map(product => {
+        // Xác định productType
+        let productType = 1;
+        if (product.variants && product.variants.length > 0) {
+          productType = 3;
+        } else if (product.productAttributeValues && product.productAttributeValues.length > 0) {
+          productType = 2;
+        }
+
+        let marketPrice = parseFloat(product.products_market_price) || 0;
+        let salePrice = parseFloat(product.products_sale_price) || 0;
+
+        if (productType === 2) {
+          // Giá thị trường giữ nguyên
+          const extraPrices = product.productAttributeValues
+            .map(item => parseFloat(item?.attributeValue?.extra_price))
+            .filter(val => !isNaN(val));
+
+          if (extraPrices.length > 0) {
+            salePrice = Math.min(...extraPrices);
+          }
+        } else if (productType === 3) {
+          const variantPrices = product.variants.map(v => parseFloat(v.price)).filter(v => !isNaN(v));
+          const variantSalePrices = product.variants.map(v => parseFloat(v.price_sale)).filter(v => !isNaN(v));
+
+          if (variantPrices.length > 0) marketPrice = Math.min(...variantPrices);
+          if (variantSalePrices.length > 0) salePrice = Math.min(...variantSalePrices);
+        }
+
+        return {
+          ...product.toJSON(),
+          market_price: marketPrice,
+          sale_price: salePrice,
+          products_market_price: marketPrice,
+          products_sale_price: salePrice,
+        };
+      });
+
+      return {
+        ...category.toJSON(),
+        products: productsWithPrices,
+      };
+    });
+
+    res.json(categoriesWithPrices);
   } catch (err) {
     console.error("Lỗi lấy homepage data:", err);
     res.status(500).json({ message: "Lỗi server", error: err.message });

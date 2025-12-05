@@ -1,7 +1,8 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Row, Col, Image, Button } from "react-bootstrap";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 // Hàm định dạng tiền VND
 const formatVND = (value) =>
@@ -12,15 +13,104 @@ const formatVND = (value) =>
   });
 
 export default function CheckoutCart({ cartItems, onCheckout, submitting, onTotalChange }) {
+  const [voucherInfo, setVoucherInfo] = useState(null);
+
+  // Validate lại voucher từ localStorage khi component mount hoặc cartItems thay đổi
+  useEffect(() => {
+    const validateVoucher = async () => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      // Nếu giỏ hàng trống, xóa voucher
+      if (cartItems.length === 0) {
+        setVoucherInfo(null);
+        localStorage.removeItem("appliedVoucher");
+        return;
+      }
+
+      const savedVoucher = localStorage.getItem("appliedVoucher");
+      if (!savedVoucher) {
+        setVoucherInfo(null);
+        return;
+      }
+
+      try {
+        const voucher = JSON.parse(savedVoucher);
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          setVoucherInfo(null);
+          localStorage.removeItem("appliedVoucher");
+          return;
+        }
+
+        // Validate lại voucher với backend
+        const totalPrice = cartItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+
+        const productIds = cartItems.map((item) => {
+          return item.id_product || item.product?.id_products;
+        }).filter(Boolean);
+
+        if (productIds.length === 0 || totalPrice <= 0) {
+          setVoucherInfo(null);
+          localStorage.removeItem("appliedVoucher");
+          return;
+        }
+
+        const res = await axios.post(
+          "http://localhost:5000/api/voucher/apply",
+          {
+            code: voucher.code,
+            total: totalPrice,
+            productIds: productIds,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        // Voucher vẫn hợp lệ, cập nhật lại thông tin
+        setVoucherInfo(res.data.voucher);
+        localStorage.setItem("appliedVoucher", JSON.stringify(res.data.voucher));
+      } catch (err) {
+        // Voucher không còn hợp lệ, xóa khỏi localStorage
+        console.log("Voucher không còn hợp lệ:", err.response?.data?.message || err.message);
+        setVoucherInfo(null);
+        localStorage.removeItem("appliedVoucher");
+      }
+    };
+
+    validateVoucher();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems]); // Validate lại khi cartItems thay đổi
 
   const totalPrice = cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
 
+  // Tính tổng tiền sau khi giảm giá
+  const calculateFinalTotal = () => {
+    if (!voucherInfo) return totalPrice;
+    if (voucherInfo.discount_type === "percent") {
+      return totalPrice * (1 - voucherInfo.discount_value / 100);
+    } else {
+      return Math.max(0, totalPrice - voucherInfo.discount_value);
+    }
+  };
+
+  const finalTotal = calculateFinalTotal();
+  const discountAmount = totalPrice - finalTotal;
+
   React.useEffect(() => {
-    onTotalChange(totalPrice);
-  }, [totalPrice, onTotalChange]);
+    onTotalChange(finalTotal);
+  }, [finalTotal, onTotalChange]);
 
   const router = useRouter();
 
@@ -128,8 +218,21 @@ export default function CheckoutCart({ cartItems, onCheckout, submitting, onTota
       })}
 
       {/* Tổng tiền */}
-      <div className="text-end fw-bold mt-3 fs-5">
-        Tổng cộng: {formatVND(totalPrice)}
+      <div className="mt-3 border-top pt-3">
+        <div className="d-flex justify-content-between mb-2">
+          <span>Tạm tính:</span>
+          <span>{formatVND(totalPrice)}</span>
+        </div>
+        {voucherInfo && discountAmount > 0 && (
+          <div className="d-flex justify-content-between text-success mb-2">
+            <span>Giảm giá ({voucherInfo.code}):</span>
+            <span>-{formatVND(discountAmount)}</span>
+          </div>
+        )}
+        <div className="d-flex justify-content-between fw-bold fs-5 border-top pt-2">
+          <span>Tổng cộng:</span>
+          <span className="text-primary">{formatVND(finalTotal)}</span>
+        </div>
       </div>
 
       <div className="d-flex gap-2 mt-3">

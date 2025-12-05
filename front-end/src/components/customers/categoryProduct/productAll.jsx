@@ -49,13 +49,13 @@ export default function ProductGrid({ products = [] }) {
 
           return (
             <div key={product.id_products || i} className='product-card'>
-              <a href={`/productDetail/${product.products_slug || toSlug(product.products_name)}`}>
+              <a href={`/productDetail/${product.id_products}`}>
                 <img src={imgUrl} alt={product.products_name} />
               </a>
               <h3>{product.products_name}</h3>
               <p> Giá chỉ từ {formatVND(product.market_price)}</p>
               <div className="buttons-buy">
-                <a href={`/productDetail/${product.products_slug || toSlug(product.products_name)}`}>
+                <a href={`/productDetail/${product.id_products}`}>
                   Xem chi tiết
                 </a>
               </div>

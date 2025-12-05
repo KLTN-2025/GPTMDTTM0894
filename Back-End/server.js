@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const sequelize = require('./config/sequelize');
 const routes = require('./routes/index.route');
+// Tạm thời tắt kết nối Redis (giữ import để tránh lỗi ở các controller khác)
 const redisClient = require('./config/redisClient');
 const cookieParser = require('cookie-parser');
 
@@ -25,8 +26,8 @@ sequelize.authenticate()
     console.error('❌ Kết nối MySQL thất bại:', err);
   });
 
-// Kết nối Redis
-redisClient.connect().catch(console.error);
+// Kết nối Redis - Tạm thời tắt
+// redisClient.connect().catch(console.error);
 
 // Middlewares
 app.use(cors({

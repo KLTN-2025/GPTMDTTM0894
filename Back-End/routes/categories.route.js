@@ -9,7 +9,7 @@ router.get('/', categoryController.getCategories); // Lấy tất cả
 
 router.get('/parent', categoryController.getParentCategories); //lấy danh mục cha cho trang khách
 
-router.get('/category-product/:name', categoryController.getCategoryDetail);
+router.get('/category-product/:id', categoryController.getCategoryDetail); // ✅ Lấy theo category_id
 
 router.get('/parent/:parentId', categoryController.getChildrenByParentId); // Lấy theo parent_id
 

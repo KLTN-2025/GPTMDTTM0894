@@ -4,23 +4,14 @@ const upload = require('../helper/upload'); // dùng multer
 const productController = require('../controllers/product.controller');
 const validateJsonMiddleware = require('../middlewares/validateJson');
 
-// ✅ SỬ DỤNG LẠI HÀM GIẢ ĐỊNH (STUB) ĐỂ KHẮC PHỤC LỖI TypeError
-const getTopProductsStub = (req, res) => {
-    // Trả về dữ liệu mẫu và status 200 OK để Server chạy và Frontend không lỗi 404
-    return res.status(200).json({
-        message: "Route Top Products OK!",
-        products: [] 
-    });
-};
-
 //get id products for admin
 router.get('/admin/:id', productController.getProductsByIdforAdmin);
 
 //search product
 router.get('/search', productController.searchProducts);
 
-// ✅ ROUTE NÀY SẼ DÙNG HÀM GIẢ ĐỊNH ĐỂ TEST TẠM
-router.get('/top-products', getTopProductsStub);
+// ✅ Route lấy top products (sản phẩm nổi bật)
+router.get('/top-products', productController.getTopProducts);
 
 //add product
 router.post(

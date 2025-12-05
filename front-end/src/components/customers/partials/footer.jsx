@@ -34,18 +34,18 @@ export default function FooterClient() {
               />
               <ul className="list-unstyled text-light footer-link-list">
                 <li>
-                  <i className="fas fa-map-marker-alt fa-fw"></i> Đẹp trai nhất Đà Nẵng
+                  <i className="fas fa-map-marker-alt fa-fw"></i> Minh Đức
                 </li>
                 <li>
                   <i className="fa fa-phone fa-fw"></i>
-                  <a className="text-decoration-none" href="tel:0777527125">
-                    0777527125
+                  <a className="text-decoration-none" href="tel:0925780025">
+                    0925780025
                   </a>
                 </li>
                 <li>
                   <i className="fa fa-envelope fa-fw"></i>
-                  <a className="text-decoration-none" href="mailto:tunlhpd09942@gmail.com">
-                    tunlhpd09942@gmail.com
+                  <a className="text-decoration-none" href="mailto:minhduc28082003@gmail.com">
+                    minhduc28082003@gmail.com
                   </a>
                 </li>
               </ul>
@@ -58,7 +58,7 @@ export default function FooterClient() {
                 {parentCategories.length > 0 ? (
                   parentCategories.map((cat) => (
                     <li key={cat.category_id}>
-                      <Link href={`/products/${cat.name}`} className="text-decoration-none">
+                      <Link href={`/products/${cat.category_id}`} className="text-decoration-none">
                         {cat.name}
                       </Link>
                     </li>

@@ -11,19 +11,20 @@ import ProductGrid from "./productAll";
 
 export default function ProductList() {
   const params = useParams();
-  const categoryName = params?.categoryName; // lấy đúng param theo route
+  const categoryId = params?.categoryName; // categoryName giờ là category_id
 
   const [categoryData, setCategoryData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!categoryName) return;
+    if (!categoryId) return;
 
     const fetchCategoryDetail = async () => {
       setLoading(true);
       try {
+        // ✅ Gọi API với category_id
         const res = await axios.get(
-          `http://localhost:5000/api/categories/category-product/${categoryName}`
+          `http://localhost:5000/api/categories/category-product/${categoryId}`
         );
         setCategoryData(res.data);
       } catch (error) {
@@ -35,7 +36,7 @@ export default function ProductList() {
     };
 
     fetchCategoryDetail();
-  }, [categoryName]);
+  }, [categoryId]);
 
   if (loading) 
     return (
